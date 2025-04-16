@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>莹石视频监控系统</title>
+    <!-- 引入莹石播放器SDK -->
+    <script src="./static/EZUIKit/ezuikit.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;  /* 移除内边距 */
+            background-color: #f0f2f5;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .container {
+            width: 100vw;  /* 修改为100%视口宽度 */
+            height: 100vh; /* 修改为100%视口高度 */
+            margin: 0;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0;  /* 移除间距 */
+            margin: 0;
+            height: 100%;
+        }
+        .video-box {
+            background: #fff;
+            padding: 0;  /* 移除内边距 */
+            border-radius: 0;  /* 移除圆角 */
+            box-shadow: none;  /* 移除阴影 */
+        }
+        .video-container {
+            width: 100%;
+            height: 50vh;  /* 修改为视口高度的50%，使两行视频正好填充满屏幕 */
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="video-grid">
+            <div class="video-box">
+                <div id="video-container1" class="video-container"></div>
+            </div>
+            <div class="video-box">
+                <div id="video-container2" class="video-container"></div>
+            </div>
+            <div class="video-box">
+                <div id="video-container3" class="video-container"></div>
+            </div>
+            <div class="video-box">
+                <div id="video-container4" class="video-container"></div>
+            </div>
+            <div class="video-box">
+                <div id="video-container5" class="video-container"></div>
+            </div>
+            <div class="video-box">
+                <div id="video-container6" class="video-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let players = [];
+        let nextPlayers = [];  // 用于存储预加载的播放器
+        let currentConfigIndex = 0;
+        
+        // 定义多组视频配置数组
+        const allVideoConfigs = [
+            // 第一组配置
+            [
+                {
+                    id: 'video-container1',
+                    url: 'ezopen://open.ys7.com/BC8991565/1.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container2',
+                    url: 'ezopen://open.ys7.com/BC8991592/1.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container3',
+                    url: 'ezopen://open.ys7.com/BC8991565/3.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container4',
+                    url: 'ezopen://open.ys7.com/BC8991565/4.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container5',
+                    url: 'ezopen://open.ys7.com/BC8991592/2.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container6',
+                    url: 'ezopen://open.ys7.com/BC8991592/3.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                }
+            ],
+            // 第二组配置
+            [
+                {
+                    id: 'video-container1',
+                    url: 'ezopen://open.ys7.com/BC8991592/1.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container2',
+                    url: 'ezopen://open.ys7.com/BC8991565/1.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container3',
+                    url: 'ezopen://open.ys7.com/BC8991592/2.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container4',
+                    url: 'ezopen://open.ys7.com/BC8991592/3.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container5',
+                    url: 'ezopen://open.ys7.com/BC8991565/3.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                },
+                {
+                    id: 'video-container6',
+                    url: 'ezopen://open.ys7.com/BC8991565/4.live',
+                    accessToken: 'at.0psjtj5zc45b1bl6bnl18eeu4cwi611v-86tt35fyyh-076jbdu-7nqnpbdh9'
+                }
+            ]
+        ];
+
+        // 初始化播放器函数
+        function initializePlayers(configs) {
+            // 停止现有播放器
+            players.forEach(player => {
+                if (player) {
+                    player.stop();
+                }
+            });
+            
+            // 清空播放器数组
+            players = [];
+            
+            // 初始化新的播放器
+            configs.forEach((config, index) => {
+                const container = document.getElementById(config.id);
+                if (container) {
+                    container.innerHTML = ''; // 清空容器
+                    players[index] = new EZUIKit.EZUIKitPlayer({
+                        id: config.id,
+                        url: config.url,
+                        accessToken: config.accessToken,
+                        autoplay: true
+                    });
+                }
+            });
+        }
+
+        // 预加载下一组视频
+        function preloadNextGroup() {
+            return new Promise((resolve) => {
+                const nextIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
+                const nextConfigs = allVideoConfigs[nextIndex];
+                let loadedCount = 0;
+                
+                // 创建隐藏的预加载容器
+                const preloadContainer = document.createElement('div');
+                preloadContainer.id = 'preload-container';
+                preloadContainer.style.position = 'fixed';
+                preloadContainer.style.top = '-9999px';
+                preloadContainer.style.opacity = '0';
+                preloadContainer.style.pointerEvents = 'none';
+                document.body.appendChild(preloadContainer);
+                
+                nextPlayers = nextConfigs.map((config, index) => {
+                    const preloadId = `preload-${config.id}`;
+                    const preloadDiv = document.createElement('div');
+                    preloadDiv.id = preloadId;
+                    preloadContainer.appendChild(preloadDiv);
+                    
+                    return new EZUIKit.EZUIKitPlayer({
+                        id: preloadId,
+                        url: config.url,
+                        accessToken: config.accessToken,
+                        autoplay: true,
+                        handleSuccess: () => {
+                            loadedCount++;
+                            if (loadedCount === nextConfigs.length) {
+                                resolve();
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
+        // 切换到下一组视频
+        async function switchToNextGroup() {
+            try {
+                // 确保预加载的视频已经准备就绪
+                const preloadContainer = document.getElementById('preload-container');
+                if (!preloadContainer || nextPlayers.length === 0) {
+                    console.log('预加载内容未就绪，跳过切换');
+                    return;
+                }
+
+                // 停止当前播放器
+                players.forEach(player => {
+                    if (player) {
+                        player.stop();
+                    }
+                });
+
+                // 更新索引
+                currentConfigIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
+                const configs = allVideoConfigs[currentConfigIndex];
+
+                // 将预加载的内容移动到主容器
+                configs.forEach((config, index) => {
+                    const container = document.getElementById(config.id);
+                    const preloadDiv = document.getElementById(`preload-${config.id}`);
+                    if (container && preloadDiv) {
+                        container.innerHTML = preloadDiv.innerHTML;
+                    }
+                });
+
+                // 清理预加载容器
+                document.body.removeChild(preloadContainer);
+
+                // 更新播放器数组并开始播放
+                players = [...nextPlayers];
+                nextPlayers = [];
+
+                // 开始预加载下一组
+                await preloadNextGroup();
+            } catch (error) {
+                console.error('切换视频时出错:', error);
+            }
+        }
+        
+        window.onload = async function() {
+            // 初始化第一组配置
+            initializePlayers(allVideoConfigs[0]);
+            
+            // 预加载第二组
+            await preloadNextGroup();
+            
+            // 每10秒切换一次
+            setInterval(switchToNextGroup, 10000);
+        }
+    </script>
+</body>
+</html>
