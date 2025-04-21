@@ -7,64 +7,291 @@
     <!-- 引入莹石播放器SDK -->
     <script src="./static/EZUIKit/ezuikit.js"></script>
     <script src="./axios.min.js"></script>
+    <script src="./devices2.js"></script>
     <style>
         body {
             margin: 0;
-            padding: 0;
-            background-color: #f0f2f5;
+            padding: 0; /* 移除内边距 */
+            background-color: #333;
             font-family: "Microsoft YaHei", sans-serif;
-            overflow: hidden; /* 禁止整个页面出现滚动条 */
         }
 
         .container {
-            width: 100vw;
-            height: 100vh;
+            width: 100vw; /* 修改为100%视口宽度 */
+            height: 100vh; /* 修改为100%视口高度 */
             margin: 0;
-            overflow: hidden; /* 禁止容器出现滚动条 */
         }
 
         .video-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(2, 50vh); /* 明确指定两行，每行50vh */
-            gap: 0;
+            gap: 0; /* 移除间距 */
             margin: 0;
-            height: 100vh; /* 固定高度为视口高度 */
-            width: 100vw; /* 固定宽度为视口宽度 */
-            overflow: hidden; /* 禁止网格出现滚动条 */
+            height: 100%;
         }
 
         .video-box {
-            background: #fff;
-            padding: 0;
-            border-radius: 0;
-            box-shadow: none;
-            overflow: hidden; /* 禁止视频框出现滚动条 */
+            /* text-align: center; */
+            /* background: #fff; */
+            padding: 0; /* 移除内边距 */
+            border-radius: 0; /* 移除圆角 */
+            box-shadow: none; /* 移除阴影 */
         }
 
         .video-container {
-            width: 100%;
-            height: 100%; /* 改为100%填满父容器 */
+            width: 99%;
+            height: 49.5vh;
             margin: 0;
+        }
+
+        /* 添加按钮样式 */
+        .nav-buttons {
+            position: fixed;
+            bottom: 50%;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .nav-button {
+            width: 50px;
+            height: 50px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            pointer-events: auto;
+            font-size: 24px;
+        }
+
+        .nav-button:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+            transform: scale(1.1);
+        }
+
+        .nav-button::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            border-top: 3px solid white;
+            border-right: 3px solid white;
+            display: block;
+        }
+
+        .nav-button.prev::before {
+            transform: rotate(-135deg);
+            margin-left: 5px;
+        }
+
+        .nav-button.next::before {
+            transform: rotate(45deg);
+            margin-right: 5px;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <div id="active-group" class="video-grid">
-        <!-- 当前显示的组 -->
+    <div class="video-grid">
+        <div class="video-box">
+            <div id="video-container1" class="video-container"></div>
+        </div>
+        <div class="video-box">
+            <div id="video-container2" class="video-container"></div>
+        </div>
+        <div class="video-box">
+            <div id="video-container3" class="video-container"></div>
+        </div>
+        <div class="video-box">
+            <div id="video-container4" class="video-container"></div>
+        </div>
+        <div class="video-box">
+            <div id="video-container5" class="video-container"></div>
+        </div>
+        <div class="video-box">
+            <div id="video-container6" class="video-container"></div>
+        </div>
     </div>
-    <div id="hidden-group" class="video-grid" style="display:none;position:absolute;left:-9999px;">
-        <!-- 预加载的组 -->
-    </div>
+</div>
+
+<!-- 添加导航按钮 -->
+<div class="nav-buttons">
+    <button class="nav-button prev" onclick="switchToPreviousGroup()"></button>
+    <button class="nav-button next" onclick="switchToNextGroup()"></button>
 </div>
 
 <script>
     let players = [];
-    let nextPlayers = []; // 预加载的下一组播放器
     let currentConfigIndex = 0;
     let accessToken = '';
+    let allVideoConfigs = [];
+    let switchTimer = null;  // 添加定时器变量
+    let tokenTimer = null;   // 添加token刷新定时器变量
 
+    // 销毁所有播放器实例
+    function destroyAllPlayers() {
+        players.forEach(player => {
+            if (player) {
+                try {
+                    player.stop();
+                    player.destroy();  // 添加destroy调用
+                } catch (error) {
+                    console.error('销毁播放器失败：', error);
+                }
+            }
+        });
+        players = [];
+    }
+
+    // 修改初始化播放器函数
+    function initializePlayers(configs) {
+        // 销毁现有播放器
+        destroyAllPlayers();
+
+        // 初始化新的播放器
+        configs.forEach((config, index) => {
+            let id = "video-container" + (index+1);
+            const container = document.getElementById(id);
+            if (container) {
+                container.innerHTML = ''; // 清空容器
+                try {
+                    let url = "ezopen://open.ys7.com/" + config.deviceSerial + "/1.live";
+                    players[index] = new EZUIKit.EZUIKitPlayer({
+                        id: id,
+                        url: url,
+                        accessToken: accessToken,
+                        autoplay: true,
+                        template: "pcLive",
+                        quality: "1"
+                    });
+                } catch (error) {
+                    console.error(`初始化播放器 ${id} 失败：`, error);
+                }
+            }
+        });
+    }
+
+    // 修改获取设备列表函数
+    async function getDeviceList() {
+        try {
+            allVideoConfigs = [];  // 清空现有配置
+            
+            // 尝试从本地JS文件获取设备配置
+            try {
+                if (typeof DeviceConfig !== 'undefined' && Array.isArray(DeviceConfig) && DeviceConfig.length > 0) {
+                    console.log('成功从本地JS文件获取设备配置，设备数量：', DeviceConfig.length);
+                    allVideoConfigs = [DeviceConfig];
+                    return true;
+                } else {
+                    throw new Error('本地配置无效');
+                }
+            } catch (localError) {
+                // 从API获取设备列表
+                console.log('正在从API获取设备列表...');
+                const response = await axios({
+                    method: 'post',
+                    url: 'https://open.ys7.com/api/lapp/device/list',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    data: {
+                        accessToken: accessToken,
+                        pageStart: 0,
+                        pageSize: 120
+                    }
+                });
+
+                if (response.data.code === '200') {
+                    const devices = response.data.data;
+                    console.log('成功从API获取设备列表，设备数量：', devices.length);
+                    allVideoConfigs = [devices];
+                    return true;
+                } else {
+                    throw new Error('API返回错误：' + response.data.msg);
+                }
+            }
+        } catch (error) {
+            console.error('获取设备列表最终失败：', error);
+            return false;
+        }
+    }
+
+    // 修改初始化播放器函数
+    function initializePlayers(configs) {
+        // 销毁现有播放器
+        destroyAllPlayers();
+
+        // 初始化新的播放器
+        for (let i = 0; i < 6; i++) {
+            let id = "video-container" + (i + 1);
+            const container = document.getElementById(id);
+            if (container) {
+                container.innerHTML = ''; // 清空容器
+                // 只有当配置中存在对应索引的设备时才创建播放器
+                if (configs[i]) {
+                    try {
+                        let url = "ezopen://open.ys7.com/" + configs[i].deviceSerial + "/1.live";
+                        players[i] = new EZUIKit.EZUIKitPlayer({
+                            id: id,
+                            url: url,
+                            accessToken: accessToken,
+                            autoplay: true,
+                            template: "pcLive",
+                            quality: "1"
+                        });
+                    } catch (error) {
+                        console.error(`初始化播放器 ${id} 失败：`, error);
+                    }
+                }
+            }
+        }
+    }
+
+    // 添加清理函数
+    function cleanup() {
+        destroyAllPlayers();
+        if (switchTimer) {
+            clearInterval(switchTimer);
+            switchTimer = null;
+        }
+        if (tokenTimer) {
+            clearInterval(tokenTimer);
+            tokenTimer = null;
+        }
+    }
+
+    // 修改window.onload
+    window.onload = async function () {
+        try {
+            cleanup(); // 先清理之前可能存在的实例
+            await getAccessToken();
+            await getDeviceList();
+            
+            if (allVideoConfigs.length > 0) {
+                initializePlayers(allVideoConfigs[0]);
+                
+                // 使用变量存储定时器
+                tokenTimer = setInterval(getAccessToken, 3600000);
+                switchTimer = setInterval(switchToNextGroup, 120000);
+            }
+        } catch (error) {
+            console.error('初始化失败：', error);
+            cleanup(); // 发生错误时也要清理
+        }
+    }
+
+    // 添加页面卸载时的清理
+    window.addEventListener('beforeunload', cleanup);
+
+    // 获取 accessToken
     async function getAccessToken() {
         try {
             const response = await axios({
@@ -80,7 +307,6 @@
             });
             if (response.data.code === '200') {
                 accessToken = response.data.data.accessToken;
-                console.log('获取到新的 accessToken:', accessToken);
                 return accessToken;
             } else {
                 throw new Error('获取 accessToken 失败：' + response.data.msg);
@@ -90,430 +316,16 @@
             return null;
         }
     }
-
-    // 定义多组视频配置数组
-    const allVideoConfigs = [
-        // 第一组配置
-        [
-            {
-                id: 'video-container1',
-                url: 'ezopen://open.ys7.com/BC8991565/1.live',
-            },
-            {
-                id: 'video-container2',
-                url: 'ezopen://open.ys7.com/BC8991592/1.live',
-            },
-            {
-                id: 'video-container3',
-                url: 'ezopen://open.ys7.com/BC8991565/3.live',
-            },
-            {
-                id: 'video-container4',
-                url: 'ezopen://open.ys7.com/BC8991565/3.live',
-            },
-            {
-                id: 'video-container5',
-                url: 'ezopen://open.ys7.com/BC8991592/2.live',
-            },
-            {
-                id: 'video-container6',
-                url: 'ezopen://open.ys7.com/BC8991592/3.live',
-            }
-        ],
-        // 第二组配置
-        [
-            {
-                id: 'video-container1',
-                url: 'ezopen://open.ys7.com/BC8991565/1.live',
-            },
-            {
-                id: 'video-container2',
-                url: 'ezopen://open.ys7.com/BC8991565/1.live',
-            },
-            {
-                id: 'video-container3',
-                url: 'ezopen://open.ys7.com/BC8991592/2.live',
-            },
-            {
-                id: 'video-container4',
-                url: 'ezopen://open.ys7.com/BC8991592/3.live',
-            },
-            {
-                id: 'video-container5',
-                url: 'ezopen://open.ys7.com/BC8991565/3.live',
-            },
-            {
-                id: 'video-container6',
-                url: 'ezopen://open.ys7.com/BC8991565/4.live',
-            }
-        ],
-        // 第二组配置
-        [
-            {
-                id: 'video-container1',
-                url: 'ezopen://open.ys7.com/BC8991565/1.live',
-            },
-            {
-                id: 'video-container2',
-                url: 'ezopen://open.ys7.com/BC8991565/1.live',
-            },
-            {
-                id: 'video-container3',
-                url: 'ezopen://open.ys7.com/BC8991592/2.live',
-            },
-            {
-                id: 'video-container4',
-                url: 'ezopen://open.ys7.com/BC8991592/3.live',
-            },
-            {
-                id: 'video-container5',
-                url: 'ezopen://open.ys7.com/BC8991565/3.live',
-            },
-            {
-                id: 'video-container6',
-                url: 'ezopen://open.ys7.com/BC8991565/4.live',
-            }
-        ]
-    ];
-
-    // 修改初始化播放器函数
-    function initializePlayers(configs) {
-        // 停止当前播放器
-        players.forEach(player => player && player.stop());
-        
-        // 如果有预加载的播放器
-        if(nextPlayers.length > 0) {
-            console.log('使用预加载的播放器');
-            players = [...nextPlayers];
-            nextPlayers = [];
-            
-            // 将预加载的播放器移动到显示容器
-            configs.forEach((config, index) => {
-                const container = document.getElementById(config.id);
-                const preloadDiv = document.getElementById(`preload-${config.id}`);
-                
-                if(container && preloadDiv && preloadDiv.firstChild) {
-                    container.innerHTML = '';
-                    container.appendChild(preloadDiv.firstChild);
-                    
-                    // 重新绑定播放器到显示容器
-                    if(players[index]) {
-                        players[index].setContainer(container);
-                        players[index].play();
-                    }
-                }
-            });
-            
-            // 移除预加载容器
-            const preloadContainers = document.querySelectorAll('[id^="preload-container"]');
-            preloadContainers.forEach(container => container.remove());
-        } 
-        else {
-            // 没有预加载时创建新播放器
-            console.log('直接创建新播放器');
-            players = [];
-            configs.forEach((config, index) => {
-                const container = document.getElementById(config.id);
-                if(container) {
-                    container.innerHTML = '';
-                    players[index] = new EZUIKit.EZUIKitPlayer({
-                        id: config.id,
-                        url: config.url,
-                        accessToken: accessToken,
-                        autoplay: true,
-                        audio: false,
-                        decoderPath: './static/EZUIKit/'
-                    });
-                }
-            });
-        }
-    }
-
-    // 修改预加载函数，添加加载完成回调
-    function preloadNextGroup() {
-        const nextIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
-        const nextConfigs = allVideoConfigs[nextIndex];
-        
-        // 创建预加载容器
-        const preloadContainer = document.createElement('div');
-        preloadContainer.id = `preload-container-${Date.now()}`;
-        preloadContainer.style.position = 'absolute';
-        preloadContainer.style.left = '-9999px';
-        document.body.appendChild(preloadContainer);
-
-        // 清理之前的预加载
-        nextPlayers.forEach(player => player && player.stop());
-        nextPlayers = [];
-        
-        // 跟踪加载完成的视频数量
-        let loadedCount = 0;
-        const totalVideos = nextConfigs.length;
-        
-        // 预加载下一组
-        nextConfigs.forEach((config, index) => {
-            const preloadDiv = document.createElement('div');
-            preloadDiv.id = `preload-${config.id}`;
-            preloadContainer.appendChild(preloadDiv);
-            
-            // 添加加载完成回调
-            const onReady = () => {
-                loadedCount++;
-                console.log(`视频 ${config.id} 预加载完成 (${loadedCount}/${totalVideos})`);
-                
-                // 所有视频加载完成后设置标志
-                if(loadedCount === totalVideos) {
-                    console.log(`第 ${nextIndex + 1} 组视频全部预加载完成，准备切换`);
-                    window.nextGroupReady = true; // 设置切换标志
-                }
-            };
-            
-            nextPlayers[index] = new EZUIKit.EZUIKitPlayer({
-                id: preloadDiv.id,
-                url: config.url,
-                accessToken: accessToken,
-                autoplay: true,
-                audio: false,
-                decoderPath: './static/EZUIKit/',
-                handleReady: onReady
-            });
-        });
-    }
-
-    // 修改切换函数
+    // 切换到下一组视频
     function switchToNextGroup() {
-        const nextIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
-        console.log(`执行切换到第 ${nextIndex + 1} 组视频`);
-        
-        // 使用预加载的播放器(如果有)
-        if(nextPlayers.length > 0) {
-            initializePlayers(allVideoConfigs[nextIndex]);
-        } else {
-            // 没有预加载时直接创建新播放器
-            console.log('预加载未完成，直接创建新播放器');
-            players.forEach(player => player && player.stop());
-            players = [];
-            allVideoConfigs[nextIndex].forEach((config, index) => {
-                const container = document.getElementById(config.id);
-                if(container) {
-                    container.innerHTML = '';
-                    players[index] = new EZUIKit.EZUIKitPlayer({
-                        id: config.id,
-                        url: config.url,
-                        accessToken: accessToken,
-                        autoplay: true,
-                        audio: false,
-                        decoderPath: './static/EZUIKit/'
-                    });
-                }
-            });
-        }
-        
-        // 更新当前组索引
-        currentConfigIndex = nextIndex;
-        
-        // 重置标志
-        window.nextGroupReady = false;
-        
-        // 预加载下下组
-        const nextNextIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
-        preloadNextGroup();
-    }
-
-    // 修改初始化函数
-    function initializePlayers() {
-        console.log('开始初始化播放器...');
-        
-        // 确保容器存在且可见
-        const activeGroup = document.getElementById('active-group');
-        if (!activeGroup) {
-            console.error('active-group容器不存在');
-            return;
-        }
-        
-        // 确保active-group可见
-        activeGroup.style.display = 'block';
-        activeGroup.style.position = 'relative';
-        activeGroup.style.left = '0';
-        
-        console.log('加载第一组视频到active-group');
-        // 直接创建视频容器和播放器
-        activeGroup.innerHTML = '';
-        allVideoConfigs[0].forEach(config => {
-            const videoBox = document.createElement('div');
-            videoBox.className = 'video-box';
-            
-            const videoContainer = document.createElement('div');
-            videoContainer.id = config.id;
-            videoContainer.className = 'video-container';
-            
-            videoBox.appendChild(videoContainer);
-            activeGroup.appendChild(videoBox);
-            
-            console.log(`创建播放器: ${config.id}, URL: ${config.url}`);
-            const player = new EZUIKit.EZUIKitPlayer({
-                id: config.id,
-                url: config.url,
-                accessToken: accessToken,
-                autoplay: true,
-                audio: false,
-                decoderPath: './static/EZUIKit/'
-            });
-            players.push(player);
-        });
-        
-        // 预加载第二组到hidden-group
-        const hiddenGroup = document.getElementById('hidden-group');
-        if (hiddenGroup) {
-            console.log('预加载第二组视频到hidden-group');
-            hiddenGroup.innerHTML = '';
-            allVideoConfigs[1].forEach(config => {
-                const videoBox = document.createElement('div');
-                videoBox.className = 'video-box';
-                
-                const videoContainer = document.createElement('div');
-                videoContainer.id = `hidden-${config.id}`;
-                videoContainer.className = 'video-container';
-                
-                videoBox.appendChild(videoContainer);
-                hiddenGroup.appendChild(videoBox);
-                
-                const player = new EZUIKit.EZUIKitPlayer({
-                    id: videoContainer.id,
-                    url: config.url,
-                    accessToken: accessToken,
-                    autoplay: true,
-                    audio: false,
-                    decoderPath: './static/EZUIKit/'
-                });
-                nextPlayers.push(player);
-            });
-        }
-        
-        // 设置定时切换
-        console.log('设置20秒定时切换');
-        setInterval(switchGroups, 20000);
-    }
-
-    // 修改切换函数
-    function switchGroups() {
-        console.log('执行视频组切换...');
-        const activeGroup = document.getElementById('active-group');
-        const hiddenGroup = document.getElementById('hidden-group');
-        
-        if (!activeGroup || !hiddenGroup) {
-            console.error('容器不存在，无法切换');
-            return;
-        }
-        
-        // 停止当前播放器
-        players.forEach(player => player && player.stop());
-        
-        // 交换显示状态
-        activeGroup.style.display = 'none';
-        hiddenGroup.style.display = 'block';
-        hiddenGroup.style.position = 'relative';
-        hiddenGroup.style.left = '0';
-        
-        // 交换ID
-        const tempId = activeGroup.id;
-        activeGroup.id = hiddenGroup.id;
-        hiddenGroup.id = tempId;
-        
-        // 交换播放器数组
-        const tempPlayers = players;
-        players = nextPlayers;
-        nextPlayers = [];
-        
-        // 更新当前组索引
         currentConfigIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
-        
-        // 预加载下一组
-        const nextIndex = (currentConfigIndex + 1) % allVideoConfigs.length;
-        console.log(`预加载第 ${nextIndex + 1} 组视频`);
-        
-        // 清空当前隐藏容器(原active-group)
-        document.getElementById('hidden-group').innerHTML = '';
-        
-        // 加载下一组到隐藏容器
-        const configs = allVideoConfigs[nextIndex];
-        const container = document.getElementById('hidden-group');
-        
-        configs.forEach(config => {
-            const videoBox = document.createElement('div');
-            videoBox.className = 'video-box';
-            
-            const videoContainer = document.createElement('div');
-            videoContainer.id = `hidden-${config.id}`;
-            videoContainer.className = 'video-container';
-            
-            videoBox.appendChild(videoContainer);
-            container.appendChild(videoBox);
-            
-            const player = new EZUIKit.EZUIKitPlayer({
-                id: videoContainer.id,
-                url: config.url,
-                accessToken: accessToken,
-                autoplay: true,
-                audio: false,
-                decoderPath: './static/EZUIKit/'
-            });
-            nextPlayers.push(player);
-        });
+        initializePlayers(allVideoConfigs[currentConfigIndex]);
     }
 
-    // 修改加载视频组函数
-    function loadVideoGroup(containerId, configs) {
-        const container = document.getElementById(containerId);
-        if (!container) {
-            console.error(`容器 ${containerId} 不存在`);
-            return;
-        }
-        
-        // 先清空容器
-        container.innerHTML = '';
-        
-        // 创建新的视频网格
-        const grid = document.createElement('div');
-        grid.className = 'video-grid';
-        
-        configs.forEach(config => {
-            const videoBox = document.createElement('div');
-            videoBox.className = 'video-box';
-            
-            const videoContainer = document.createElement('div');
-            videoContainer.id = config.id;  // 使用原始ID
-            videoContainer.className = 'video-container';
-            
-            videoBox.appendChild(videoContainer);
-            grid.appendChild(videoBox);
-            
-            // 创建播放器
-            const player = new EZUIKit.EZUIKitPlayer({
-                id: videoContainer.id,
-                url: config.url,
-                accessToken: accessToken,
-                autoplay: true,
-                audio: false,
-                decoderPath: './static/EZUIKit/'
-            });
-            
-            // 如果是active-group，添加到players数组
-            if(containerId === 'active-group') {
-                players.push(player);
-            }
-        });
-        
-        container.appendChild(grid);
-    }
-
-    window.onload = async function() {
-        try {
-            await getAccessToken();
-            initializePlayers();
-            setInterval(getAccessToken, 3600000);
-        } catch (error) {
-            console.error('初始化失败：', error);
-        }
+    // 切换到上一组视频
+    function switchToPreviousGroup() {
+        currentConfigIndex = (currentConfigIndex - 1 + allVideoConfigs.length) % allVideoConfigs.length;
+        initializePlayers(allVideoConfigs[currentConfigIndex]);
     }
 </script>
 </body>
