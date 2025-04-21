@@ -188,7 +188,11 @@
             try {
                 if (typeof DeviceConfig !== 'undefined' && Array.isArray(DeviceConfig) && DeviceConfig.length > 0) {
                     console.log('成功从本地JS文件获取设备配置，设备数量：', DeviceConfig.length);
-                    allVideoConfigs = [DeviceConfig];
+                     // 将设备分组，每组6个
+                     for (let i = 0; i < DeviceConfig.length; i += 6) {
+                        const group = DeviceConfig.slice(i, i + 6);
+                        allVideoConfigs.push(group);
+                    }
                     return true;
                 } else {
                     throw new Error('本地配置无效');
@@ -212,7 +216,11 @@
                 if (response.data.code === '200') {
                     const devices = response.data.data;
                     console.log('成功从API获取设备列表，设备数量：', devices.length);
-                    allVideoConfigs = [devices];
+                    // 将设备分组，每组6个
+                    for (let i = 0; i < devices.length; i += 6) {
+                        const group = devices.slice(i, i + 6);
+                        allVideoConfigs.push(group);
+                    }
                     return true;
                 } else {
                     throw new Error('API返回错误：' + response.data.msg);
