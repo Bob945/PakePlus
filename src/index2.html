@@ -7,6 +7,7 @@
     <!-- 引入莹石播放器SDK -->
     <script src="./static/EZUIKit/ezuikit.js"></script>
     <script src="./axios.min.js"></script>
+    <script src="https://diting.aitops.cn//hjm_bigscreen/devices2.js"></script>
     <style>
         body {
             margin: 0;
@@ -140,7 +141,7 @@
         players.forEach(player => {
             if (player) {
                 try {
-                    player.stop();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+                    player.stop();
                     player.destroy();  // 添加destroy调用
                 } catch (error) {
                     console.error('销毁播放器失败：', error);
@@ -181,41 +182,52 @@
     // 修改获取设备列表函数
     async function getDeviceList() {
         try {
-            const response = await axios({
-                method: 'post',
-                url: 'https://open.ys7.com/api/lapp/device/list',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                data: {
-                    accessToken: accessToken,
-                    pageStart: 0,
-                    pageSize: 120
+            allVideoConfigs = [];  // 清空现有配置
+            
+            // 尝试从本地JS文件获取设备配置
+            try {
+                if (typeof DeviceConfig !== 'undefined' && Array.isArray(DeviceConfig) && DeviceConfig.length > 0) {
+                    console.log('成功从本地JS文件获取设备配置，设备数量：', DeviceConfig.length);
+                     // 将设备分组，每组6个
+                     for (let i = 0; i < DeviceConfig.length; i += 6) {
+                        const group = DeviceConfig.slice(i, i + 6);
+                        allVideoConfigs.push(group);
+                    }
+                    return true;
+                } else {
+                    throw new Error('本地配置无效');
                 }
-            });
-            if (response.data.code === '200') {
-                const devices = response.data.data;
-                allVideoConfigs = [];  // 清空现有配置
+            } catch (localError) {
+                // 从API获取设备列表
+                console.log('正在从API获取设备列表...');
+                const response = await axios({
+                    method: 'post',
+                    url: 'https://open.ys7.com/api/lapp/device/list',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    data: {
+                        accessToken: accessToken,
+                        pageStart: 0,
+                        pageSize: 120
+                    }
+                });
 
-                // 计算要获取的设备起始位置
-                const totalDevices = devices.length;
-                const halfCount = Math.floor(totalDevices / 2);
-                const startIndex = totalDevices - halfCount;
-
-                // 只获取后半部分的设备
-                const selectedDevices = devices.slice(startIndex);
-
-                // 将设备分组，每组6个
-                for (let i = 0; i < selectedDevices.length; i += 6) {
-                    const group = selectedDevices.slice(i, i + 6);
-                    allVideoConfigs.push(group);
+                if (response.data.code === '200') {
+                    const devices = response.data.data;
+                    console.log('成功从API获取设备列表，设备数量：', devices.length);
+                    // 将设备分组，每组6个
+                    for (let i = 0; i < devices.length; i += 6) {
+                        const group = devices.slice(i, i + 6);
+                        allVideoConfigs.push(group);
+                    }
+                    return true;
+                } else {
+                    throw new Error('API返回错误：' + response.data.msg);
                 }
-                return true;
-            } else {
-                throw new Error('获取设备列表失败：' + response.data.msg);
             }
         } catch (error) {
-            console.error('获取设备列表出错：', error);
+            console.error('获取设备列表最终失败：', error);
             return false;
         }
     }
@@ -303,7 +315,6 @@
             });
             if (response.data.code === '200') {
                 accessToken = response.data.data.accessToken;
-                console.log('获取到新的 accessToken:', accessToken);
                 return accessToken;
             } else {
                 throw new Error('获取 accessToken 失败：' + response.data.msg);
