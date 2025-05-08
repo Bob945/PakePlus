@@ -1,6 +1,6 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "华家曼-视频投屏",
+    "productName": "华家曼-视频投屏false",
     "version": "0.0.1",
     "identifier": "AITops.HJM",
     "build": {"frontendDist": "../src"},
